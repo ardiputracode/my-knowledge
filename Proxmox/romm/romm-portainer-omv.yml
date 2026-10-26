@@ -1,0 +1,67 @@
+# RomM Stack for OpenMediaVault + Portainer
+# Panduan lengkap: RomM_OMV_Portainer_Installation_Guide.md
+# Buat tiga secret pada Portainer > Stacks > Environment variables
+# ROMM_DB_ROOT_PASSWORD, ROMM_DB_PASSWORD, ROMM_AUTH_SECRET_KEY
+
+services:
+  romm:
+    image: rommapp/romm:latest
+    container_name: romm
+    restart: unless-stopped
+    ports:
+      - "8181:8080"
+    environment:
+      TZ: Asia/Jakarta
+      DB_HOST: romm-db
+      DB_NAME: romm
+      DB_USER: romm-user
+      DB_PASSWD: "${ROMM_DB_PASSWORD:?Set ROMM_DB_PASSWORD in Portainer}"
+      ROMM_AUTH_SECRET_KEY: "${ROMM_AUTH_SECRET_KEY:?Set ROMM_AUTH_SECRET_KEY in Portainer}"
+
+      # Provider metadata opsional; boleh dikosongkan pada deployment awal
+      SCREENSCRAPER_USER: "${SCREENSCRAPER_USER:-}"
+      SCREENSCRAPER_PASSWORD: "${SCREENSCRAPER_PASSWORD:-}"
+      IGDB_CLIENT_ID: "${IGDB_CLIENT_ID:-}"
+      IGDB_CLIENT_SECRET: "${IGDB_CLIENT_SECRET:-}"
+      STEAMGRIDDB_API_KEY: "${STEAMGRIDDB_API_KEY:-}"
+      RETROACHIEVEMENTS_API_KEY: "${RETROACHIEVEMENTS_API_KEY:-}"
+      HASHEOUS_API_ENABLED: "true"
+
+    volumes:
+      # Docker named volumes
+      - romm_resources:/romm/resources
+      - romm_redis_data:/redis-data
+
+      # ROM library di folder yang dapat dibagikan melalui SMB OMV
+      - /srv/dev-disk-by-uuid-87d634ab-40dc-437c-b70f-6785297a78d8/SMB/romm/library:/romm/library
+
+      # Aplikasi / file upload di Docker AppData
+      - /srv/dev-disk-by-uuid-87d634ab-40dc-437c-b70f-6785297a78d8/docker/appdata/romm/assets:/romm/assets
+      - /srv/dev-disk-by-uuid-87d634ab-40dc-437c-b70f-6785297a78d8/docker/appdata/romm/config:/romm/config
+
+    depends_on:
+      romm-db:
+        condition: service_healthy
+
+  romm-db:
+    image: mariadb:11
+    container_name: romm-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: "${ROMM_DB_ROOT_PASSWORD:?Set ROMM_DB_ROOT_PASSWORD in Portainer}"
+      MARIADB_DATABASE: romm
+      MARIADB_USER: romm-user
+      MARIADB_PASSWORD: "${ROMM_DB_PASSWORD:?Set ROMM_DB_PASSWORD in Portainer}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:
+  romm_resources:
+  romm_redis_data:
